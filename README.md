@@ -538,6 +538,7 @@ bag_assistant/
 ├── data/
 │   └── training_bugs/   рабочий корпус: 54 документа + export_manifest.json
 ├── docs/                архитектура, RAG, оценка, ADR, выбор embedding-модели
+├── experiments/         сравнение single-agent и multi-agent: cases.json, run_benchmark.py, results.json
 ├── scripts/             ingest.py, container_start.py, оценка RAG
 ├── tests/               unit, chat, bot, eval
 ├── .dockerignore
