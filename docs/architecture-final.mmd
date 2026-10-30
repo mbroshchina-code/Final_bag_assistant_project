@@ -1,0 +1,76 @@
+%% Итоговая архитектура «Баг-ассистент техподдержки»
+%% 4 слоя по референсу docs/architecture.md.
+%% Зелёный — работает; серый пунктир — подготовлено, но не в сборке / в плане.
+flowchart TB
+    classDef done fill:#E9F3E9,stroke:#3F7D3F,stroke-width:2px,color:#1F2937
+    classDef planned fill:#F5F5F5,stroke:#9E9E9E,stroke-width:1.5px,stroke-dasharray:5 4,color:#6B7280
+    classDef data fill:#F7EDE8,stroke:#C65D3B,stroke-width:2px,color:#1F2937
+    classDef ext fill:#FFFFFF,stroke:#A8431E,stroke-width:1.5px,color:#1F2937
+
+    CLIENT["Оператор в Telegram"]:::ext
+
+    subgraph L1["1 · Gateway"]
+        direction LR
+        NGINX["Nginx + HTTPS<br/>rate limit + auth"]:::planned
+        API["FastAPI routes.py<br/>/chats · /chats/new<br/>/chats/{id}/messages"]:::done
+        GUARD["SSE guard<br/>replace + error + done"]:::done
+    end
+
+    subgraph L2["2 · ChatService"]
+        direction LR
+        MOD["Модерация<br/>вход / выход"]:::done
+        HIST["История диалога<br/>+ бюджет токенов"]:::done
+        RW["LLM rewrite запроса"]:::done
+        RAG["CitationRAGService<br/>поиск + цитаты"]:::done
+    end
+
+    subgraph L3["3 · LLM"]
+        direction LR
+        LLMS["LLMService<br/>retry 3× (не стрим)"]:::done
+        CACHE{"Redis cache<br/>TTL 1 ч"}:::done
+        OAI["OpenAI gpt-4o-mini<br/>primary"]:::done
+        LITE["LiteLLM Proxy<br/>fallback + circuit breaker"]:::planned
+        OR["OpenRouter<br/>gpt-oss-20b:free"]:::planned
+        OLL["Ollama<br/>qwen2.5-7B"]:::planned
+    end
+
+    subgraph L4["4 · Data"]
+        direction LR
+        REPO["JsonChatRepository<br/>ACTIVE"]:::done
+        JSONL[("messages.jsonl<br/>chat.json")]:::data
+        PG["PostgresChatRepository<br/>NOT CONNECTED"]:::planned
+        QD[("Qdrant<br/>ingest_training_bugs")]:::data
+        DS[("Docstore<br/>полные карточки")]:::data
+        FB[("Feedback JSONL")]:::data
+        LEG[("Qdrant documents<br/>103 бага, Б5.1")]:::planned
+    end
+
+    subgraph ING["Ingestion (admin)"]
+        direction LR
+        UPL["POST /documents/upload"]:::done
+        CHUNK["semantic_recursive<br/>512 / 32"]:::done
+        EMB["text-embedding-3-small"]:::done
+    end
+
+    CLIENT --> NGINX
+    NGINX --> API
+    CLIENT -.->|"сейчас: напрямую 127.0.0.1:8000"| API
+    API --> GUARD --> MOD --> HIST
+    HIST --> REPO
+    REPO --> JSONL
+    REPO -.-> PG
+    HIST --> RW --> RAG
+    RAG --> QD --> DS
+    RAG --> LLMS
+    RW --> LLMS
+    LLMS --> CACHE
+    LLMS -->|"сейчас: напрямую"| OAI
+    LLMS -.->|"если USE_LITELLM_PROXY=true"| LITE
+    LITE --> OAI
+    LITE -.-> OR
+    LITE -.-> OLL
+    API --> FB
+    UPL --> CHUNK --> EMB
+    EMB --> QD
+    EMB --> DS
+    LEG -.->|"не используется в чате"| RAG
