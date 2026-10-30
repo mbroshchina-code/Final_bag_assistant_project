@@ -540,11 +540,14 @@ bag_assistant/
 ├── docs/                архитектура, RAG, оценка, ADR, выбор embedding-модели
 ├── scripts/             ingest.py, container_start.py, оценка RAG
 ├── tests/               unit, chat, bot, eval
-├── var/                 chats, ingestion, embeddings-cache
+├── .dockerignore
+├── .env.example
+├── .gitignore
 ├── docker-compose.yml
 ├── Dockerfile
-├── .env.example
-└── pyproject.toml
+├── pyproject.toml
+├── README.md
+└── uv.lock
 ```
 
 ## Документация
